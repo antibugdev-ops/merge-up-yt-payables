@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- YouTube Playables SDK: must load before any game code -->
+<script src="https://www.youtube.com/game_api/v1"></script>
+<title>Merge Up</title>
+<style>
+:root{--ink:#1d1140;--deep:#2a0f6b;--btn:#ffd23f}
+*{box-sizing:border-box}
+html{height:100%}
+body{margin:0;min-height:100%;display:grid;place-items:center;background:linear-gradient(135deg,#4a1fd1,#a62fd0 50%,#e0407f);background-size:220% 220%;animation:drift 16s ease-in-out infinite alternate;color:#fff;font-family:ui-rounded,"SF Pro Rounded",Nunito,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;user-select:none;-webkit-user-select:none;overscroll-behavior:none;touch-action:manipulation}
+@keyframes drift{to{background-position:100% 100%}}
+main{--bs:max(150px,min(92vw,440px,calc(100vh - 250px)));display:grid;grid-template-columns:var(--bs);grid-template-areas:"h" "b" "c";gap:12px;padding:8px 0}
+header{grid-area:h;display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{margin:0;font-size:clamp(28px,9vw,44px);font-weight:900;letter-spacing:-.02em;color:#ffe14d;text-shadow:0 3px 0 rgba(42,15,107,.6)}
+.scores{display:flex;gap:8px}
+.box{position:relative;background:#fff;color:var(--ink);border-radius:12px;padding:6px 12px;min-width:68px;text-align:center;box-shadow:0 4px 0 rgba(42,15,107,.4)}
+.box small{display:block;font-size:12px;opacity:.75}
+.box b{font-size:20px}
+.plus{position:absolute;left:0;right:0;top:-2px;font-weight:900;color:#ffe14d;text-shadow:0 2px 0 var(--deep);pointer-events:none;animation:rise .7s ease-out forwards}
+@keyframes rise{to{transform:translateY(-34px);opacity:0}}
+#board{grid-area:b;position:relative;width:var(--bs);height:var(--bs);background:rgba(32,8,84,.55);border-radius:16px;box-shadow:0 8px 0 rgba(32,8,84,.4),0 18px 40px rgba(32,8,84,.35);touch-action:none}
+#cells,#tiles{position:absolute;inset:8px}
+#cells{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+#cells i{background:rgba(255,255,255,.14);border-radius:10px}
+.tile{position:absolute;left:0;top:0;width:calc((100% - 24px) / 4);height:calc((100% - 24px) / 4);transform:translate(calc(var(--c) * (100% + 8px)),calc(var(--r) * (100% + 8px)));transition:transform .12s ease-out}
+.in{width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:10px;font-weight:900;font-size:calc(var(--bs) * .1);color:var(--ink);background-color:#fff;background-image:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,0) 60%);box-shadow:0 4px 0 rgba(0,0,0,.25),inset 0 3px 0 rgba(255,255,255,.4)}
+.in.l3{font-size:calc(var(--bs) * .082)}.in.l4{font-size:calc(var(--bs) * .065)}.in.l5{font-size:calc(var(--bs) * .052)}
+.in[data-v="2"]{background-color:#7bf1a8}.in[data-v="4"]{background-color:#4de8e0}.in[data-v="8"]{background-color:#5ab0ff}
+.in[data-v="16"]{background-color:#8c7bff}.in[data-v="32"]{background-color:#d276ff}.in[data-v="64"]{background-color:#ff6fd8}
+.in[data-v="128"]{background-color:#ff6b6b}.in[data-v="256"]{background-color:#ff9f43}.in[data-v="512"]{background-color:#ffd23f}
+.in[data-v="1024"]{background-color:#b4f23d}.in[data-v="2048"]{background-color:#fff27a;box-shadow:0 4px 0 rgba(0,0,0,.25),0 0 22px #ffe14d}
+.new{animation:appear .2s cubic-bezier(.3,1.6,.5,1) .1s backwards}
+.pop{animation:pop .22s ease-out}
+@keyframes appear{from{transform:scale(.2);opacity:0}}
+@keyframes pop{50%{transform:scale(1.3)}}
+.tile.fx{transition:none;pointer-events:none;z-index:3}
+.fx i{position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4px;border-radius:50%;animation:fly .55s ease-out forwards}
+@keyframes fly{to{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+.jig{animation:jig .35s ease-out}
+@keyframes jig{20%{transform:rotate(-1.2deg) scale(1.02)}50%{transform:rotate(1.2deg) scale(1.02)}80%{transform:rotate(-.6deg)}}
+@media (prefers-reduced-motion:reduce){body{animation:none}.tile{transition:none}.new,.pop,.jig,.plus{animation:none}.plus{display:none}}
+#over{position:absolute;inset:0;border-radius:16px;background:rgba(32,8,84,.88);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-size:28px;font-weight:900;z-index:4}
+#load{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#4a1fd1,#e0407f);color:#fff;font-size:24px;font-weight:800}
+[hidden]{display:none!important}
+#ctl{grid-area:c;display:flex;flex-direction:column;gap:10px}
+#msg{min-height:2.6em;margin:0;text-align:center;font-size:15px;font-weight:600;text-shadow:0 1px 3px rgba(42,15,107,.75)}
+button{font:inherit;font-weight:800;border:0;border-radius:12px;min-height:48px;padding:0 18px;background:var(--btn);color:var(--ink);cursor:pointer;box-shadow:0 4px 0 rgba(42,15,107,.45);transition:transform .08s,box-shadow .08s}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(42,15,107,.45)}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.pad{display:flex;gap:8px}
+.pad button{flex:1;background:rgba(255,255,255,.22);color:#fff;font-size:22px;box-shadow:0 4px 0 rgba(42,15,107,.35)}
+@media (min-aspect-ratio:5/4){
+  main{--bs:min(92vh,58vw,560px);grid-template-columns:var(--bs) minmax(170px,280px);grid-template-areas:"b h" "b c";column-gap:20px;align-content:center}
+  header{flex-wrap:wrap;align-self:end}
+  #ctl{align-self:start}
+}
+</style>
+</head>
+<body>
+<div id="load" data-i18n="load">Loading…</div>
+<main>
+  <header>
+    <h1>Merge Up</h1>
+    <div class="scores">
+      <div class="box"><small data-i18n="score">Score</small><b id="s">0</b></div>
+      <div class="box"><small data-i18n="best">Best</small><b id="best">0</b></div>
+    </div>
+  </header>
+  <div id="board" role="img">
+    <div id="cells"></div>
+    <div id="tiles"></div>
+    <div id="over" hidden><span data-i18n="over">Game over</span><button id="again" data-i18n="again">Try again</button></div>
+  </div>
+  <div id="ctl">
+    <p id="msg" role="status" aria-live="polite"></p>
+    <div class="pad">
+      <button data-d="0">&#8592;</button><button data-d="1">&#8593;</button>
+      <button data-d="3">&#8595;</button><button data-d="2">&#8594;</button>
+    </div>
+    <button id="new" data-i18n="new">New game</button>
+  </div>
+</main>
+<script>
+(() => {
+  const yt = window.ytgame, N = 4;
+  const T = {
+    en:{load:"Loading…",score:"Score",best:"Best",new:"New game",over:"Game over",again:"Try again",hint:"Swipe or use the arrow keys to merge tiles. Reach 2048!"},
+    es:{load:"Cargando…",score:"Puntos",best:"Récord",new:"Nueva partida",over:"Fin del juego",again:"Reintentar",hint:"Desliza o usa las flechas para unir fichas. ¡Llega a 2048!"},
+    fr:{load:"Chargement…",score:"Score",best:"Record",new:"Nouvelle partie",over:"Partie terminée",again:"Réessayer",hint:"Balayez ou utilisez les flèches pour fusionner les tuiles. Atteignez 2048 !"},
+    pt:{load:"Carregando…",score:"Pontos",best:"Recorde",new:"Novo jogo",over:"Fim de jogo",again:"Tentar de novo",hint:"Deslize ou use as setas para juntar as peças. Chegue a 2048!"},
+    de:{load:"Lädt…",score:"Punkte",best:"Rekord",new:"Neues Spiel",over:"Spiel vorbei",again:"Nochmal",hint:"Wische oder nutze die Pfeiltasten, um Kacheln zu verbinden. Erreiche 2048!"}
+  };
+  const $ = id => document.getElementById(id);
+  const safe = f => { try { return f(); } catch (e) {} };
+  const inYT = !!(yt && yt.IN_PLAYABLES_ENV);
+  let lang = "en", grid = Array(16).fill(null), s = 0, best = 0, over = false;
+  let ready = false, paused = false, audioOn = true, ac, saveTimer, overTimer, sent = -1;
+  const t = k => T[lang][k];
+  const val = i => grid[i] ? grid[i].v : 0;
+
+  function setLang(code) {
+    const k = String(code || "en").slice(0, 2).toLowerCase();
+    lang = T[k] ? k : "en";
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach(e => { e.textContent = t(e.dataset.i18n); });
+    ui();
+  }
+
+  // ----- tiles -----
+  function pos(tl) { tl.el.style.setProperty("--r", tl.p >> 2); tl.el.style.setProperty("--c", tl.p & 3); }
+  function paint(tl) {
+    const n = String(tl.v);
+    tl.inn.textContent = n;
+    tl.inn.dataset.v = tl.v;
+    tl.inn.classList.remove("l3", "l4", "l5");
+    if (n.length > 2) tl.inn.classList.add("l" + Math.min(n.length, 5));
+  }
+  function mk(v, p, isNew) {
+    const el = document.createElement("div"), inn = document.createElement("div");
+    el.className = "tile"; inn.className = "in" + (isNew ? " new" : "");
+    inn.addEventListener("animationend", () => inn.classList.remove("new", "pop"));
+    el.appendChild(inn);
+    const tl = { v, p, el, inn, m: false };
+    paint(tl); pos(tl);                 // set position before inserting so it doesn't slide in from the corner
+    $("tiles").appendChild(el);
+    return tl;
+  }
+  function spawn() {
+    const e = [];
+    for (let i = 0; i < 16; i++) if (!grid[i]) e.push(i);
+    if (!e.length) return;
+    const p = e[Math.random() * e.length | 0];
+    grid[p] = mk(Math.random() < .9 ? 2 : 4, p, true);
+  }
+
+  // ----- juice: bursts, floating score, cheers -----
+  const COL = ["#7bf1a8","#4de8e0","#5ab0ff","#8c7bff","#d276ff","#ff6fd8","#ff6b6b","#ff9f43","#ffd23f","#b4f23d","#fff27a"];
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let topSeen = 0, cheerT;
+  function burst(p, v) {
+    if (calm) return;
+    const fx = document.createElement("div");
+    fx.className = "tile fx";
+    fx.style.setProperty("--r", p >> 2); fx.style.setProperty("--c", p & 3);
+    const col = COL[Math.min(Math.log2(v) - 1, COL.length - 1)], n = Math.min(16, 6 + Math.log2(v));
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement("i"), a = Math.random() * 6.283, r = 30 + Math.random() * 40;
+      d.style.cssText = `--dx:${Math.cos(a) * r}px;--dy:${Math.sin(a) * r}px;background:${i % 3 ? col : "#fff"}`;
+      fx.appendChild(d);
+    }
+    $("tiles").appendChild(fx);
+    setTimeout(() => fx.remove(), 600);
+  }
+  function plus(g) {
+    if (calm) return;
+    const e = document.createElement("span");
+    e.className = "plus"; e.textContent = "+" + g;
+    $("s").parentNode.appendChild(e);
+    setTimeout(() => e.remove(), 700);
+  }
+  function cheer(v) {
+    clearTimeout(cheerT);
+    $("msg").textContent = "\u{1F389} " + v + "!";
+    cheerT = setTimeout(ui, 2200);
+  }
+
+  // ----- game logic -----
+  const idx = (d, i) => { const a = [0, 1, 2, 3].map(j => d % 2 ? j * 4 + i : i * 4 + j); return d > 1 ? a.reverse() : a; };
+  const canMove = () => grid.some((tl, i) => !tl || (i % N < N - 1 && val(i + 1) === tl.v) || (i < 12 && val(i + 4) === tl.v));
+
+  function move(d) {
+    if (!ready || over || paused) return;
+    let moved = false, gain = 0;
+    const ng = Array(16).fill(null), dead = [], surv = [];
+    const place = (tl, p) => { if (tl.p !== p) { moved = true; tl.p = p; } };
+    for (let i = 0; i < N; i++) {
+      const ix = idx(d, i), ts = ix.map(k => grid[k]).filter(Boolean);
+      let j = 0, last = null;
+      ts.forEach(tl => {
+        if (last && last.v === tl.v && !last.m) {
+          last.v *= 2; last.m = true; gain += last.v;
+          surv.push(last); dead.push(tl); place(tl, ix[j - 1]);
+        } else {
+          tl.m = false; ng[ix[j]] = tl; place(tl, ix[j]); last = tl; j++;
+        }
+      });
+    }
+    if (!moved) return;
+    grid = ng;
+    s += gain; if (s > best) best = s;
+    grid.forEach(tl => tl && pos(tl));
+    dead.forEach(pos);
+    surv.forEach(tl => { const p = tl.p; setTimeout(() => { paint(tl); tl.inn.classList.add("pop"); burst(p, tl.v); }, 110); });
+    dead.forEach(tl => setTimeout(() => tl.el.remove(), 130));
+    spawn();
+    const top = gain ? Math.max(...surv.map(x => x.v)) : 0;
+    if (gain) { const f = 300 + Math.log2(top) * 45; beep(f, .18, .14); setTimeout(() => beep(f * 1.5, .1, .16), 70); }
+    else beep(180, .07, .05);
+    over = !canMove();
+    ui();
+    if (gain) {
+      plus(gain);
+      if (top >= 256) { $("board").classList.remove("jig"); void $("board").offsetWidth; $("board").classList.add("jig"); }
+      if (top >= 128 && top > topSeen && !over) { topSeen = top; cheer(top); }
+    }
+    if (over) { showOver(); save(); sendBest(); } else queueSave();
+  }
+
+  function showOver() { clearTimeout(overTimer); overTimer = setTimeout(() => { $("over").hidden = false; $("again").focus(); }, 280); }
+
+  function clearBoard() {
+    clearTimeout(overTimer); $("over").hidden = true;
+    $("tiles").innerHTML = ""; grid = Array(16).fill(null);
+  }
+  function newGame() {
+    if (!ready) return;
+    clearBoard(); s = 0; over = false; topSeen = 0;
+    spawn(); spawn(); ui(); save(); sendBest();
+  }
+
+  function ui() {
+    $("s").textContent = s;
+    $("best").textContent = best;
+    $("msg").textContent = over ? t("over") + ": " + s : t("hint");
+    $("board").setAttribute("aria-label", [0, 1, 2, 3].map(r => [0, 1, 2, 3].map(c => val(r * 4 + c) || "-").join(" ")).join("; "));
+  }
+
+  // ----- audio (respects YouTube mute) -----
+  function unlock() {
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+    } catch (e) {}
+  }
+  function beep(f, vol, dur) {
+    if (!audioOn || paused) return;
+    unlock();
+    if (!ac) return;
+    try {
+      const o = ac.createOscillator(), g = ac.createGain(), n = ac.currentTime;
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(vol, n);
+      g.gain.exponentialRampToValueAtTime(.001, n + dur);
+      o.connect(g); g.connect(ac.destination);
+      o.start(n); o.stop(n + dur);
+    } catch (e) {}
+  }
+
+  // ----- cloud save (YouTube) with localStorage fallback outside YouTube -----
+  const pack = () => JSON.stringify({ b: grid.map(tl => tl ? tl.v : 0), s, best, over });
+  function save() {
+    if (!ready) return;                 // never save before loadData has finished
+    const d = pack();
+    if (inYT) safe(() => Promise.resolve(yt.game.saveData(d)).catch(() => {}));
+    else safe(() => localStorage.setItem("mergeup", d));
+  }
+  function queueSave() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { save(); sendBest(); }, 800); }
+  function sendBest() {
+    if (!inYT || best <= 0 || best === sent) return;
+    sent = best;
+    safe(() => Promise.resolve(yt.engagement.sendScore({ value: best })).catch(() => {}));
+  }
+  async function load() {
+    let d = "";
+    try { d = inYT ? await yt.game.loadData() : localStorage.getItem("mergeup"); } catch (e) {}
+    clearBoard();
+    try {
+      const o = JSON.parse(d);
+      if (Array.isArray(o.b) && o.b.length === 16) {
+        o.b.forEach((v, i) => { v = +v; if (v > 0 && v < 1e7) grid[i] = mk(v, i, false); });
+        s = +o.s || 0; best = Math.max(+o.best || 0, s);
+        over = !canMove();
+        topSeen = Math.max(0, ...grid.map(tl => tl ? tl.v : 0));
+        if (over) $("over").hidden = false;
+        return;
+      }
+    } catch (e) {}
+    s = 0; over = false; spawn(); spawn();
+  }
+
+  // ----- input -----
+  const keys = { ArrowLeft:0, a:0, ArrowUp:1, w:1, ArrowRight:2, d:2, ArrowDown:3, s:3 };
+  addEventListener("keydown", e => {
+    const d = keys[e.key];
+    if (d !== undefined && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); unlock(); move(d); }
+  });
+  let p = null;
+  $("board").addEventListener("pointerdown", e => { unlock(); p = [e.clientX, e.clientY]; });
+  addEventListener("pointerup", e => {
+    if (!p) return;
+    const x = e.clientX - p[0], y = e.clientY - p[1];
+    p = null;
+    if (Math.max(Math.abs(x), Math.abs(y)) < 24) return;
+    move(Math.abs(x) > Math.abs(y) ? (x < 0 ? 0 : 2) : (y < 0 ? 1 : 3));
+  });
+  document.querySelectorAll("[data-d]").forEach(x => { x.onclick = () => { unlock(); move(+x.dataset.d); }; });
+  $("new").onclick = () => { unlock(); newGame(); };
+  $("again").onclick = () => { unlock(); newGame(); };
+
+  // ----- YouTube Playables hooks -----
+  // Only ask YouTube about audio when actually running inside Playables;
+  // outside it (local file, itch.io) sound is simply on.
+  audioOn = inYT ? safe(() => yt.system.isAudioEnabled()) !== false : true;
+  if (inYT) {
+    safe(() => yt.system.onAudioEnabledChange(on => { audioOn = !!on; if (!on && ac) ac.suspend(); }));
+    safe(() => yt.system.onPause(() => {
+      paused = true; clearTimeout(saveTimer);
+      save(); sendBest();
+      if (ac) ac.suspend();
+    }));
+    safe(() => yt.system.onResume(() => { paused = false; }));
+  }
+  addEventListener("error", () => safe(() => yt.health.logError()));
+
+  // ----- start -----
+  $("cells").innerHTML = "<i></i>".repeat(16);
+  $("board").addEventListener("animationend", e => { if (e.target === $("board")) $("board").classList.remove("jig"); });
+  requestAnimationFrame(() => safe(() => yt.game.firstFrameReady()));   // loading screen is visible
+  (async () => {
+    try { setLang(await safe(() => yt.system.getLanguage())); } catch (e) { setLang("en"); }
+    await load();
+    ready = true;
+    ui();
+    $("load").hidden = true;                                           // nothing non-interactive on screen
+    safe(() => yt.game.gameReady());
+    sendBest();
+  })();
+})();
+</script>
+</body>
+</html>
